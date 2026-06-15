@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Optymalizator Jadłospisu Rodzinnego</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; color: #333; }
+        .container { max-width: 950px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-top: 0; }
+        
+        .panel { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e0e0e0; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .panel-family { background-color: #f8fdf8; border-color: #c8e6c9; }
+        .panel-portions { background-color: #f0f8ff; border-color: #b3e5fc; }
+        .panel-fridge { background-color: #fffaf0; border-color: #ffe0b2; }
+        
+        .meal-card { background: #fafafa; border-left: 5px solid #4CAF50; margin-bottom: 12px; padding: 15px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Zmodyfikowany summary-box dla lepszej czytelności makro */
+        .summary-box { background: #e3f2fd; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #81d4fa; }
+        .summary-box h4 { margin-top: 0; color: #0277bd; margin-bottom: 15px; }
+        .summary-stats { display: flex; gap: 20px; flex-wrap: wrap; font-size: 1.05em; }
+        .stat-item { background: white; padding: 10px 15px; border-radius: 5px; border: 1px solid #b3e5fc; }
+        
+        .btn-primary { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: background 0.3s; }
+        .btn-primary:hover { background: #45a049; }
+        .btn-primary.calc-btn { background: #ff9800; margin-top: 20px; }
+        .btn-primary.calc-btn:hover { background: #f57c00; }
+        
+        .btn-small { padding: 5px 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; text-decoration: none; display: inline-block; text-align: center; }
+        .btn-small.link-btn { background-color: #2196F3; font-weight: bold; }
+        .btn-small.link-btn:hover { background-color: #1976D2; }
+        
+        .fridge-row { margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+        .fridge-item { display: inline-block; background: #ffebee; padding: 6px 12px; margin: 5px 5px 5px 0; border-radius: 15px; font-size: 0.9em; border: 1px solid #ffcdd2; }
+        
+        .slider-group { display: flex; flex-direction: column; gap: 15px; }
+        .slider-label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; color: #555; }
+        .unit-badge { font-weight: bold; color: #7f8c8d; min-width: 45px; text-align: center; background: #ecf0f1; padding: 4px; border-radius: 4px; font-size: 14px;}
+        
+        .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .grid-form label { font-size: 13px; font-weight: bold; color: #555; display: block; margin-bottom: 4px; }
+        .grid-form input, .grid-form select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        .member-card { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); min-width: 200px; flex: 1 1 200px; border: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wielokryterialny Planer Posiłków</h1>
+        
+        <div class="panel panel-family">
+            <h3>Użytkownicy</h3>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px;">
+                {% for member in family_members %}
+                <div class="member-card">
+                    <strong style="font-size: 1.1em; color: #2c3e50;">{{ member.name }}</strong> 
+                    <span style="color: #7f8c8d; font-size: 0.9em;">({% if member.gender == 'M' %}Mężczyzna{% else %}Kobieta{% endif %})</span><br>
+                    
+                    <div style="margin: 10px 0; font-size: 0.95em; color: #555; line-height: 1.6;">
+                        <strong>Cel:</strong> {{ member.get_goal_display }}<br>
+                        <strong>Waga:</strong> {{ member.weight }} kg | <strong>Wzrost:</strong> {{ member.height }} cm<br>
+                        <strong>Wiek:</strong> {{ member.age }} lat <br>
+                        <strong>Aktywność:</strong> {{ member.get_activity_level_display }}
+                    </div>
+                    
+                    <form method="POST" style="margin-top: 10px;">
+                        {% csrf_token %}
+                        <input type="hidden" name="delete_member_id" value="{{ member.id }}">
+                        <button type="submit" class="btn-small" style="width: 100%;">❌ Usuń profil</button>
+                    </form>
+                </div>
+                {% empty %}
+                <p style="color: #e67e22; font-weight: bold;">Brak zdefiniowanych członków rodziny. Dodaj pierwszą osobę, aby algorytm mógł wyliczyć zapotrzebowanie!</p>
+                {% endfor %}
+            </div>
+
+            <form method="POST" style="background: white; padding: 20px; border-radius: 6px; border: 1px dashed #4CAF50;">
+                {% csrf_token %}
+                <h4 style="margin-top: 0; color: #27ae60;">➕ Dodaj nowego członka rodziny</h4>
+                <div class="grid-form">
+                    {% for field in member_form %}
+                    <div>
+                        <label>{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="submit" name="add_member" class="btn-primary">Zapisz osobę w bazie</button>
+            </form>
+        </div>
+
+        {% if family_goals.members %}
+        <div class="panel panel-portions">
+            <h3>Podział porcji</h3>
+            <p style="margin-top: 0; font-size: 0.9em; color: #555;">Algorytm ułoży jeden zoptymalizowany, duży posiłek celujący w <strong>{{ target_kcal }} kcal</strong>. Oto jak należy go rozdzielić:</p>
+            <ul style="margin-bottom: 0;">
+                {% for member in family_goals.members %}
+                <li style="margin-bottom: 5px;">
+                    <strong>{{ member.name }}:</strong> powinien otrzymać zjeść <strong style="color: #d35400;">{{ member.portion_percentage }}%</strong> przygotowanego dania.
+                    <span style="color: #7f8c8d; font-size: 0.85em;">(Osobiste zapotrzebowanie: {{ member.needs.kcal }} kcal)</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="panel panel-fridge">
+                <h3>1. Ustawienia Algorytmu i Parametry Diety</h3>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 25px; align-items: flex-end; margin-bottom: 20px;">
+                    <div>
+                        <label style="font-weight: bold; color: #333; display: block; margin-bottom: 6px;">Metoda Optymalizacji:</label>
+                        <select name="algorithm" style="padding: 8px; font-size: 15px; border-radius: 4px; border: 1px solid #ccc; width: 260px; cursor: pointer;">
+                            <option value="greedy" {% if selected_algo == 'greedy' %}selected{% endif %}>Algorytm Zachłanny (Greedy)</option>
+                            <option value="aco" {% if selected_algo == 'aco' %}selected{% endif %}>Algorytm Mrówkowy (ACO)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="font-weight: bold; font-size: 13px; color: #555; display: block; margin-bottom: 6px;">📅 Liczba dni:</label>
+                        <input type="number" name="days" value="{{ current_days|default:4 }}" min="1" max="14" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 100px; box-sizing: border-box;">
+                    </div>
+                    
+                    <div>
+                        <label style="font-weight: bold; font-size: 13px; color: #555; display: block; margin-bottom: 6px;">🍽️ Posiłki dziennie:</label>
+                        <input type="number" name="meals_per_day" value="{{ current_meals|default:3 }}" min="1" max="6" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 120px; box-sizing: border-box;">
+                    </div>
+                </div>
+                
+                {% if family_goals.members %}
+                <div style="background: #fff; padding: 12px; border-radius: 4px; border: 1px solid #ddd; display: inline-block;">
+                    <strong style="color: #d35400;">Cel obliczony dla rodziny:</strong>
+                    <span style="margin: 0 10px;">🔥 {{ target_kcal }} kcal</span> |
+                    <span style="margin: 0 10px;">🍗 Białko: {{ target_pro }}g</span> |
+                    <span style="margin: 0 10px;">🥑 Tłuszcz: {{ target_fat }}g</span> |
+                    <span style="margin: 0 10px;">🍞 Węgle: {{ target_carb }}g</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="panel panel-fridge">
+                <h3>2. Jakie składniki chcesz zużyć?</h3>
+                <div id="fridge-container">
+                    {% for item in initial_fridge %}
+                    <div class="fridge-row">
+                        <select name="ing_name[]" style="width: 250px; padding: 6px;" onchange="updateUnitLabel(this)">
+                            {% for option in all_ingredients %}
+                                <option value="{{ option }}" {% if option == item.name %}selected{% endif %}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" name="ing_qty[]" value="{{ item.qty|stringformat:'s' }}" step="0.1" style="width: 80px; padding: 6px;" placeholder="Ilość">
+                        <span class="unit-badge">{{ item.unit }}</span>
+                        <button type="button" class="btn-small" onclick="this.parentElement.remove()">Usuń</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" style="margin-top: 10px; padding: 8px 15px; cursor: pointer; background: #eee; border: 1px solid #ccc; border-radius: 4px;" onclick="addFridgeRow()">+ Dodaj kolejny składnik</button>
+            </div>
+
+            <div class="panel">
+                <h3>Planer</h3>
+
+            <div class="panel">
+                <h3>3. Wagi optymalizacji (Co jest priorytetem?)</h3>
+                <div class="slider-group">
+                    <div>
+                        <label class="slider-label">
+                            <span>♻️ Zero Waste</span>
+                            <span id="val_waste" style="color: #e67e22;">{{ weight_waste|default:5 }}</span>
+                        </label>
+                        <input type="range" name="weight_waste" min="1" max="10" value="{{ weight_waste|default:5 }}" style="width: 100%; cursor: pointer;" oninput="document.getElementById('val_waste').innerText = this.value">
+                    </div>
+                    <div>
+                        <label class="slider-label">
+                            <span>🔥 Zgodność z Kaloriami</span>
+                            <span id="val_kcal" style="color: #e67e22;">{{ weight_kcal|default:5 }}</span>
+                        </label>
+                        <input type="range" name="weight_kcal" min="1" max="10" value="{{ weight_kcal|default:5 }}" style="width: 100%; cursor: pointer;" oninput="document.getElementById('val_kcal').innerText = this.value">
+                    </div>
+                    <div>
+                        <label class="slider-label">
+                            <span>🥑 Zgodność z Makro (Białko, Tłuszcz, Węgle)</span>
+                            <span id="val_macro" style="color: #e67e22;">{{ weight_macro|default:5 }}</span>
+                        </label>
+                        <input type="range" name="weight_macro" min="1" max="10" value="{{ weight_macro|default:5 }}" style="width: 100%; cursor: pointer;" oninput="document.getElementById('val_macro').innerText = this.value">
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" name="calculate_schedule" class="btn-primary calc-btn">Kalkuluj Harmonogram Rodzinny</button>
+        </form>
+
+        <hr style="margin: 40px 0; border: 0; height: 1px; background: #ddd;">
+
+        <div class="summary-box">
+            <h4>📈 Średnia realizacja przez algorytm (na 1 posiłek):</h4>
+            <div class="summary-stats">
+                <div class="stat-item">
+                    🔥 Kcal: <strong>{{ avg_kcal }}</strong> <br>
+                    <small style="color: #7f8c8d;">Cel: {{ target_kcal }}</small>
+                </div>
+                <div class="stat-item">
+                    🍗 Białko: <strong>{{ avg_pro }}g</strong> <br>
+                    <small style="color: #7f8c8d;">Cel: {{ target_pro }}g</small>
+                </div>
+                <div class="stat-item">
+                    🥑 Tłuszcz: <strong>{{ avg_fat }}g</strong> <br>
+                    <small style="color: #7f8c8d;">Cel: {{ target_fat }}g</small>
+                </div>
+                <div class="stat-item">
+                    🍞 Węgle: <strong>{{ avg_carb }}g</strong> <br>
+                    <small style="color: #7f8c8d;">Cel: {{ target_carb }}g</small>
+                </div>
+            </div>
+        </div>
+
+        <h2>Zoptymalizowany Harmonogram</h2>
+        {% for meal in schedule %}
+            <div class="meal-card">
+                <div>
+                    <strong style="font-size: 1.1em; color: #2c3e50;">Dzień {{ meal.day }}, Posiłek {{ meal.meal }}:</strong> <span style="font-size: 1.1em;">{{ meal.name }}</span> <br>
+                    <small style="color: #7f8c8d; margin-top: 5px; display: inline-block;">🔥 Kcal: <strong>{{ meal.kcal }}</strong> | 🍗 Białko: <strong>{{ meal.protein }}g</strong> | 🥑 Tłuszcz: <strong>{{ meal.fat }}g</strong> | 🍞 Węgle: <strong>{{ meal.carbs }}g</strong></small>
+                </div>
+                
+                {% if meal.link and meal.link != 'nan' %}
+                <div>
+                    <a href="{{ meal.link }}" target="_blank" class="btn-small link-btn">Pokaż przepis</a>
+                </div>
+                {% endif %}
+            </div>
+        {% empty %}
+            <p style="color: #7f8c8d; font-style: italic;">Kliknij Kalkuluj, aby wygenerować jadłospis dla swojej rodziny.</p>
+        {% endfor %}
+
+        <h2 style="margin-top: 30px;">Po ugotowaniu zostało:</h2>
+        <div style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #eee;">
+            {% for item in leftovers %}
+                <span class="fridge-item"><strong>{{ item.name }}</strong> ({{ item.qty }} {{ item.unit }})</span>
+            {% empty %}
+                <span style="color: #27ae60; font-weight: bold;">Zero marnotrawstwa, świetna robota !</span>
+            {% endfor %}
+        </div>
+    </div>
+
+   {{ all_ingredients|json_script:"ingredients-data" }}
+   {{ ingredient_units|json_script:"units-data" }}
+
+    <script>
+        const availableIngredients = JSON.parse(document.getElementById('ingredients-data').textContent);
+        const unitsDataElement = document.getElementById('units-data');
+        const ingredientUnits = unitsDataElement ? JSON.parse(unitsDataElement.textContent) : {};
+
+        function updateUnitLabel(selectElement) {
+            const selectedIngredient = selectElement.value;
+            const row = selectElement.parentElement;
+            const unitBadge = row.querySelector('.unit-badge');
+            
+            if (unitBadge) {
+                if (selectedIngredient && ingredientUnits[selectedIngredient]) {
+                    unitBadge.textContent = ingredientUnits[selectedIngredient];
+                } else {
+                    unitBadge.textContent = 'pc';
+                }
+            }
+        }
+
+        function addFridgeRow() {
+            const container = document.getElementById('fridge-container');
+            const row = document.createElement('div');
+            row.className = 'fridge-row';
+
+            let selectHTML = '<select name="ing_name[]" style="width: 250px; padding: 6px;" onchange="updateUnitLabel(this)">';
+            selectHTML += '<option value="">-- Wybierz z listy --</option>';
+            availableIngredients.forEach(ing => {
+                selectHTML += `<option value="${ing}">${ing}</option>`;
+            });
+            selectHTML += '</select>';
+
+            row.innerHTML = `
+                ${selectHTML}
+                <input type="number" name="ing_qty[]" step="0.1" value="1.0" style="width: 80px; padding: 6px;" placeholder="Ilość">
+                <span class="unit-badge">pc</span>
+                <button type="button" class="btn-small" onclick="this.parentElement.remove()">Usuń</button>
+            `;
+            container.appendChild(row);
+        }
+
+        window.onload = function() {
+            const container = document.getElementById('fridge-container');
+            if(container && container.children.length === 0) {
+                addFridgeRow();
+            }
+        };
+    </script>
+</body>
+</html>
